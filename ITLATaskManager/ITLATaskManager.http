@@ -1,0 +1,6 @@
+@ITLATaskManager_HostAddress = http://localhost:5052
+
+GET {{ITLATaskManager_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
