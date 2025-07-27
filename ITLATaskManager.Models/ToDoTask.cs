@@ -1,4 +1,6 @@
-﻿namespace ITLATaskManager.Models
+﻿using System.Text.Json.Serialization;
+
+namespace ITLATaskManager.Models
 {
     public class ToDoTask<T>
     {
@@ -8,5 +10,11 @@
         public DateTime DueDate { get; set; }
         public string Status { get; set; }
         public T AdditionalData { get; set; }
+        [JsonIgnore]
+        public Func<DateTime, int> DaysRemaining => currentDate =>
+        {
+            var daysLeft = (DueDate - currentDate).Days;
+            return daysLeft < 0 ? 0 : daysLeft;
+        };
     }
 }
