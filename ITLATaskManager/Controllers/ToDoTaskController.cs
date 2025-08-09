@@ -48,6 +48,33 @@ namespace ITLATaskManagerAPI.Controllers
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
+        [HttpPost("createHighPriority")]
+        public async Task<IActionResult> CreateHighPriorityTask([FromBody] CreateTaskDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Description) && string.IsNullOrWhiteSpace(dto.Title))
+            {
+                return BadRequest("Description cannot be null or empty");
+            }
+
+            var task = ToDoTaskFactory.CreateHighPriorityTask(dto.Title, dto.Description);
+            await _context.ToDoTasks.AddAsync(task);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
+        }
+
+        [HttpPost("createLowPriority")]
+        public async Task<IActionResult> CreateLowPriorityTask([FromBody] CreateTaskDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Description) && string.IsNullOrWhiteSpace(dto.Title))
+            {
+                return BadRequest("Description cannot be null or empty");
+            }
+            var task = ToDoTaskFactory.CreateLowPriorityTask(dto.Title, dto.Description);
+            await _context.ToDoTasks.AddAsync(task);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
+        }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTask(int id, ToDoTask<string> task)
         {
