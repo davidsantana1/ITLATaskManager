@@ -38,10 +38,19 @@ namespace ITLATaskManagerAPI.Controllers
             return Ok(tasks);
         }
 
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPendingTasks()
+        {
+            var pendingTasks = await _context
+                .ToDoTasks.Where(t => t.Status == "Pending")
+                .ToListAsync();
+            return Ok(pendingTasks);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetTaskById(int id)
         {
-            var task = await _context.ToDoTasks.FirstOrDefaultAsync(t => t.Id == id);
+            var task = await FindTaskByIdAsync(id);
             if (task == null)
             {
                 return NotFound();
@@ -56,11 +65,14 @@ namespace ITLATaskManagerAPI.Controllers
             {
                 return BadRequest("Task cannot be null");
             }
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var validationResult = ValidateTaskModel(task);
+            if (validationResult != null)
+                return validationResult;
 
             await _context.ToDoTasks.AddAsync(task);
             await _context.SaveChangesAsync();
+            Action<ToDoTask<string>> notifyCreation = task =>
+                Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
@@ -98,10 +110,11 @@ namespace ITLATaskManagerAPI.Controllers
             {
                 return BadRequest("Task ID mismatch");
             }
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var validationResult = ValidateTaskModel(task);
+            if (validationResult != null)
+                return validationResult;
 
-            var existingTask = await _context.ToDoTasks.FirstOrDefaultAsync(t => t.Id == id);
+            var existingTask = await FindTaskByIdAsync(id);
             if (existingTask == null)
             {
                 return NotFound();
@@ -118,7 +131,7 @@ namespace ITLATaskManagerAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTask(int id)
         {
-            var task = await _context.ToDoTasks.FirstOrDefaultAsync(t => t.Id == id);
+            var task = await FindTaskByIdAsync(id);
             if (task == null)
             {
                 return NotFound();
