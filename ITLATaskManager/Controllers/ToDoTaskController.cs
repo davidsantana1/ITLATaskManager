@@ -1,5 +1,6 @@
 ﻿using ITLATaskManager.DataAccess.Data;
 using ITLATaskManager.Models;
+using ITLATaskManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,9 +11,24 @@ namespace ITLATaskManagerAPI.Controllers
     public class ToDoTaskController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly Func<(int, int), double> _memoizedCompletionPercentage;
+        private readonly Func<
+            (ApplicationDbContext, string),
+            Task<List<ToDoTask<string>>>
+        > _memoizedFilterByStatus;
+
         public ToDoTaskController(ApplicationDbContext context)
         {
             _context = context;
+
+            // Create memoized functions
+            Func<(int, int), double> completionPercentageFunc = (parameters) =>
+                TaskUtils.CalculateCompletionPercentage(parameters.Item1, parameters.Item2);
+            _memoizedCompletionPercentage = completionPercentageFunc.Memoize();
+
+            Func<(ApplicationDbContext, string), Task<List<ToDoTask<string>>>> filterByStatusFunc =
+                (parameters) => TaskUtils.FilterTasksByStatus(parameters);
+            _memoizedFilterByStatus = filterByStatusFunc.Memoize();
         }
 
         [HttpGet]
@@ -111,6 +127,39 @@ namespace ITLATaskManagerAPI.Controllers
             _context.ToDoTasks.Remove(task);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpGet("completion-percentage")]
+        public async Task<IActionResult> GetCompletionPercentage()
+        {
+            var totalTasks = await _context.ToDoTasks.CountAsync();
+            var completedTasks = await _context.ToDoTasks.CountAsync(t => t.Status == "Completed");
+
+            var percentage = _memoizedCompletionPercentage((totalTasks, completedTasks));
+
+            return Ok(
+                new
+                {
+                    TotalTasks = totalTasks,
+                    CompletedTasks = completedTasks,
+                    CompletionPercentage = percentage,
+                }
+            );
+        }
+
+        [HttpGet("by-status/{status}")]
+        public async Task<IActionResult> GetTasksByStatus(string status)
+        {
+            var tasks = await _memoizedFilterByStatus((_context, status));
+
+            return Ok(
+                new
+                {
+                    Status = status,
+                    Count = tasks.Count,
+                    Tasks = tasks,
+                }
+            );
         }
     }
 }

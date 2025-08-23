@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ITLATaskManager.DataAccess\ITLATaskManager.DataAccess.csproj" />
     <ProjectReference Include="..\ITLATaskManager.Middleware\ITLATaskManager.Middleware.csproj" />
+    <ProjectReference Include="..\ITLATaskManager.Utils\ITLATaskManager.Utils.csproj" />
   </ItemGroup>
 
 </Project>
