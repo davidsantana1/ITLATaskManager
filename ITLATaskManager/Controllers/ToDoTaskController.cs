@@ -11,9 +11,24 @@ namespace ITLATaskManagerAPI.Controllers
     public class ToDoTaskController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly Func<(int, int), double> _memoizedCompletionPercentage;
+        private readonly Func<
+            (ApplicationDbContext, string),
+            Task<List<ToDoTask<string>>>
+        > _memoizedFilterByStatus;
+
         public ToDoTaskController(ApplicationDbContext context)
         {
             _context = context;
+
+            // Create memoized functions
+            Func<(int, int), double> completionPercentageFunc = (parameters) =>
+                TaskUtils.CalculateCompletionPercentage(parameters.Item1, parameters.Item2);
+            _memoizedCompletionPercentage = completionPercentageFunc.Memoize();
+
+            Func<(ApplicationDbContext, string), Task<List<ToDoTask<string>>>> filterByStatusFunc =
+                (parameters) => TaskUtils.FilterTasksByStatus(parameters);
+            _memoizedFilterByStatus = filterByStatusFunc.Memoize();
         }
 
         [HttpGet]
@@ -26,7 +41,9 @@ namespace ITLATaskManagerAPI.Controllers
         [HttpGet("pending")]
         public async Task<IActionResult> GetPendingTasks()
         {
-            var pendingTasks = await _context.ToDoTasks.Where(t => t.Status == "Pending").ToListAsync();
+            var pendingTasks = await _context
+                .ToDoTasks.Where(t => t.Status == "Pending")
+                .ToListAsync();
             return Ok(pendingTasks);
         }
 
@@ -49,11 +66,13 @@ namespace ITLATaskManagerAPI.Controllers
                 return BadRequest("Task cannot be null");
             }
             var validationResult = ValidateTaskModel(task);
-            if (validationResult != null) return validationResult;
+            if (validationResult != null)
+                return validationResult;
 
             await _context.ToDoTasks.AddAsync(task);
             await _context.SaveChangesAsync();
-            Action<ToDoTask<string>> notifyCreation = task => Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
+            Action<ToDoTask<string>> notifyCreation = task =>
+                Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
@@ -92,7 +111,8 @@ namespace ITLATaskManagerAPI.Controllers
                 return BadRequest("Task ID mismatch");
             }
             var validationResult = ValidateTaskModel(task);
-            if (validationResult != null) return validationResult;
+            if (validationResult != null)
+                return validationResult;
 
             var existingTask = await FindTaskByIdAsync(id);
             if (existingTask == null)
@@ -122,18 +142,37 @@ namespace ITLATaskManagerAPI.Controllers
             return NoContent();
         }
 
-        private async Task<ToDoTask<string>?> FindTaskByIdAsync(int id)
+        [HttpGet("completion-percentage")]
+        public async Task<IActionResult> GetCompletionPercentage()
         {
-            return await _context.ToDoTasks.FindAsync(id);
+            var totalTasks = await _context.ToDoTasks.CountAsync();
+            var completedTasks = await _context.ToDoTasks.CountAsync(t => t.Status == "Completed");
+
+            var percentage = _memoizedCompletionPercentage((totalTasks, completedTasks));
+
+            return Ok(
+                new
+                {
+                    TotalTasks = totalTasks,
+                    CompletedTasks = completedTasks,
+                    CompletionPercentage = percentage,
+                }
+            );
         }
 
-        private IActionResult ValidateTaskModel(ToDoTask<string> task)
+        [HttpGet("by-status/{status}")]
+        public async Task<IActionResult> GetTasksByStatus(string status)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-            if (!TaskValidation.DefaultValidator(task))
-                return BadRequest("Invalid task data");
-            return null!;
+            var tasks = await _memoizedFilterByStatus((_context, status));
+
+            return Ok(
+                new
+                {
+                    Status = status,
+                    Count = tasks.Count,
+                    Tasks = tasks,
+                }
+            );
         }
     }
 }
