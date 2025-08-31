@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using ITLATaskManager.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ITLATaskManager.DataAccess.Data
 {
     public class ApplicationDbContext : DbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-        {
-        }
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options) { }
 
         public DbSet<Models.ToDoTask<string>> ToDoTasks { get; set; }
+        public DbSet<User> Users { get; set; }
     }
 }

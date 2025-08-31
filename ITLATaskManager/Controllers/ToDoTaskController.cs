@@ -1,6 +1,7 @@
 ﻿using ITLATaskManager.DataAccess.Data;
 using ITLATaskManager.Models;
 using ITLATaskManager.Utils;
+using ITLATaskManagerAPI.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +9,11 @@ namespace ITLATaskManagerAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [RequireRole]
     public class ToDoTaskController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+
         public ToDoTaskController(ApplicationDbContext context)
         {
             _context = context;
@@ -26,7 +29,9 @@ namespace ITLATaskManagerAPI.Controllers
         [HttpGet("pending")]
         public async Task<IActionResult> GetPendingTasks()
         {
-            var pendingTasks = await _context.ToDoTasks.Where(t => t.Status == "Pending").ToListAsync();
+            var pendingTasks = await _context
+                .ToDoTasks.Where(t => t.Status == "Pending")
+                .ToListAsync();
             return Ok(pendingTasks);
         }
 
@@ -49,11 +54,13 @@ namespace ITLATaskManagerAPI.Controllers
                 return BadRequest("Task cannot be null");
             }
             var validationResult = ValidateTaskModel(task);
-            if (validationResult != null) return validationResult;
+            if (validationResult != null)
+                return validationResult;
 
             await _context.ToDoTasks.AddAsync(task);
             await _context.SaveChangesAsync();
-            Action<ToDoTask<string>> notifyCreation = task => Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
+            Action<ToDoTask<string>> notifyCreation = task =>
+                Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
@@ -92,7 +99,8 @@ namespace ITLATaskManagerAPI.Controllers
                 return BadRequest("Task ID mismatch");
             }
             var validationResult = ValidateTaskModel(task);
-            if (validationResult != null) return validationResult;
+            if (validationResult != null)
+                return validationResult;
 
             var existingTask = await FindTaskByIdAsync(id);
             if (existingTask == null)

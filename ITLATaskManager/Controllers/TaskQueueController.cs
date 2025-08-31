@@ -1,3 +1,4 @@
+using ITLATaskManagerAPI.Security;
 using ITLATaskManagerAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,6 +6,7 @@ namespace ITLATaskManagerAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [RequireRole]
     public class TaskQueueController : ControllerBase
     {
         private readonly ITaskQueueService _taskQueueService;

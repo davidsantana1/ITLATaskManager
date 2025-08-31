@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reactive.Linq;
 using ITLATaskManager.DataAccess.Data;
 using ITLATaskManager.Models;
@@ -10,6 +11,7 @@ namespace ITLATaskManagerAPI.Services
     {
         void StartProcessing();
         void StopProcessing();
+        void EnqueueTask(ToDoTask<string> task);
         int QueueLength { get; }
         bool IsProcessing { get; }
     }
@@ -17,6 +19,7 @@ namespace ITLATaskManagerAPI.Services
     public class TaskQueueService : ITaskQueueService, IDisposable
     {
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ConcurrentQueue<ToDoTask<string>> _taskQueue;
         private bool _isProcessing;
         private readonly object _lockObject = new object();
         private IDisposable _queueProcessor;
@@ -24,18 +27,11 @@ namespace ITLATaskManagerAPI.Services
         public TaskQueueService(IServiceScopeFactory serviceScopeFactory)
         {
             _serviceScopeFactory = serviceScopeFactory;
+            _taskQueue = new ConcurrentQueue<ToDoTask<string>>();
             _isProcessing = false;
         }
 
-        public int QueueLength
-        {
-            get
-            {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                return context.ToDoTasks.Count(t => t.Status == "Pending");
-            }
-        }
+        public int QueueLength => _taskQueue.Count;
 
         public bool IsProcessing => _isProcessing;
 
@@ -69,17 +65,9 @@ namespace ITLATaskManagerAPI.Services
 
             try
             {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-                var pendingTask = await context
-                    .ToDoTasks.Where(t => t.Status == "Pending")
-                    .OrderBy(t => t.Id)
-                    .FirstOrDefaultAsync();
-
-                if (pendingTask != null)
+                if (_taskQueue.TryDequeue(out var task))
                 {
-                    await ProcessTaskAsync(pendingTask, context);
+                    await ProcessTaskAsync(task);
                 }
             }
             finally
@@ -91,16 +79,17 @@ namespace ITLATaskManagerAPI.Services
             }
         }
 
-        private async Task ProcessTaskAsync(ToDoTask<string> task, ApplicationDbContext context)
+        private async Task ProcessTaskAsync(ToDoTask<string> task)
         {
-            task.Status = "Processing";
-            await context.SaveChangesAsync();
+            var processingTime = task.AdditionalData == "High Priority" ? 2000 : 5000;
+            await Task.Delay(processingTime);
 
-            var time = task.AdditionalData == "High Priority" ? 2000 : 5000;
-            await Task.Delay(time);
+            Console.WriteLine($"Task processed: {task.Title} - Priority: {task.AdditionalData}");
+        }
 
-            task.Status = "Completed";
-            await context.SaveChangesAsync();
+        public void EnqueueTask(ToDoTask<string> task)
+        {
+            _taskQueue.Enqueue(task);
         }
 
         public void Dispose()
