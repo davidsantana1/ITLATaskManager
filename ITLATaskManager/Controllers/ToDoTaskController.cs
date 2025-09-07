@@ -1,8 +1,10 @@
 ﻿using ITLATaskManager.DataAccess.Data;
 using ITLATaskManager.Models;
 using ITLATaskManager.Utils;
+using ITLATaskManagerAPI.Hubs;
 using ITLATaskManagerAPI.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace ITLATaskManagerAPI.Controllers
@@ -18,10 +20,12 @@ namespace ITLATaskManagerAPI.Controllers
             (ApplicationDbContext, string),
             Task<List<ToDoTask<string>>>
         > _memoizedFilterByStatus;
+        private readonly IHubContext<NotificationHub> _hubContext;
 
-        public ToDoTaskController(ApplicationDbContext context)
+        public ToDoTaskController(ApplicationDbContext context, IHubContext<NotificationHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
             Func<(int, int), double> completionPercentageFunc = (parameters) =>
                 TaskUtils.CalculateCompletionPercentage(parameters.Item1, parameters.Item2);
             _memoizedCompletionPercentage = completionPercentageFunc.Memoize();
@@ -73,6 +77,10 @@ namespace ITLATaskManagerAPI.Controllers
             await _context.SaveChangesAsync();
             Action<ToDoTask<string>> notifyCreation = task =>
                 Console.WriteLine($"Tarea creada: {task.Description}, vencimiento: {task.DueDate}");
+            await _hubContext.Clients.All.SendAsync(
+                "receiveNotification",
+                $"Tarea creada: {task.Description}, vencimiento: {task.DueDate}"
+            );
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
@@ -87,6 +95,10 @@ namespace ITLATaskManagerAPI.Controllers
             var task = ToDoTaskFactory.CreateHighPriorityTask(dto.Title, dto.Description);
             await _context.ToDoTasks.AddAsync(task);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync(
+                "receiveNotification",
+                $"Tarea de alta prioridad creada: {task.Description}, vencimiento: {task.DueDate}"
+            );
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 
@@ -100,6 +112,10 @@ namespace ITLATaskManagerAPI.Controllers
             var task = ToDoTaskFactory.CreateLowPriorityTask(dto.Title, dto.Description);
             await _context.ToDoTasks.AddAsync(task);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync(
+                "receiveNotification",
+                $"Tarea de baja prioridad creada: {task.Description}, vencimiento: {task.DueDate}"
+            );
             return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, task);
         }
 

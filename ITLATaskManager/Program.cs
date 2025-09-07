@@ -1,6 +1,7 @@
 using System.Text;
 using ITLATaskManager.DataAccess.Data;
 using ITLATaskManager.Models;
+using ITLATaskManagerAPI.Hubs;
 using ITLATaskManagerAPI.Middleware;
 using ITLATaskManagerAPI.Security;
 using ITLATaskManagerAPI.Services;
@@ -83,6 +84,7 @@ builder
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -110,5 +112,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<NotificationHub>("/notificationHub");
 
 app.Run();
